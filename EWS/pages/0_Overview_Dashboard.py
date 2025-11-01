@@ -9,9 +9,9 @@ st.set_page_config(page_title="Overview Dashboard", layout="wide")
 CSS = """
 <style>
 body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
-.stApp { background: #FFFFFF; color: #0F172A; }
-.card {background: #FFFFFF; padding: 12px; border-radius: 10px; border: 1px solid rgba(15,23,42,0.06); box-shadow: 0 6px 20px rgba(2,6,23,0.04);}
-.small {font-size:12px; color:#64748B}
+.stApp { background: #000000; color: #E6EEF8; }
+.card {background: linear-gradient(180deg,#071018 0%, #000000 100%); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.02); box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
+.small {font-size:12px; color:#9fb0d6}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -63,7 +63,7 @@ with row1[0]:
     st.markdown("**Derailment rate (12m)**")
     fig_d = go.Figure()
     fig_d.add_trace(go.Scatter(x=months, y=derail_values, mode='lines', line=dict(color='#FF8A3D'), fill='tozeroy'))
-    fig_d.update_layout(template='simple_white', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color="#0F172A"))
+    fig_d.update_layout(template='plotly_dark', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color="#E6EEF8"))
     st.plotly_chart(fig_d, use_container_width=True, key='ov_derail')
     # Insight for derailments
     change_pct = (derail_values[-1] - derail_values[0]) / derail_values[0] * 100
@@ -75,7 +75,7 @@ with row1[1]:
     st.markdown("**Locomotive availability**")
     avail = [int(avail_trend[-1]), 100-int(avail_trend[-1])]
     fig_a = go.Figure(data=[go.Pie(labels=['Available','In Maintenance'], values=avail, hole=0.6, marker=dict(colors=['#39D98A','#FF6B6B']))])
-    fig_a.update_layout(template='simple_white', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color="#0F172A"))
+    fig_a.update_layout(template='plotly_dark', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color="#E6EEF8"))
     st.plotly_chart(fig_a, use_container_width=True, key='ov_avail')
     # Insight for availability
     avail_delta = avail_trend[-1] - avail_trend[-2]
@@ -85,7 +85,7 @@ with row1[1]:
 with row1[2]:
     st.markdown("**Terminal dwell (12m)**")
     fig_dw = go.Figure(go.Scatter(x=months, y=dwell_values, mode='lines+markers', line=dict(color='#FFB300')))
-    fig_dw.update_layout(template='simple_white', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color="#0F172A"))
+    fig_dw.update_layout(template='plotly_dark', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color="#E6EEF8"))
     st.plotly_chart(fig_dw, use_container_width=True, key='ov_dwell')
     # Insight for dwell
     dwell_change = dwell_values[-1] - dwell_values[0]
@@ -98,7 +98,7 @@ row2 = st.columns(3)
 with row2[0]:
     st.markdown("**On-time performance (12m)**")
     fig_ot = go.Figure(go.Scatter(x=months, y=ontime, mode='lines+markers', line=dict(color='#39D98A')))
-    fig_ot.update_layout(template='simple_white', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color="#0F172A"))
+    fig_ot.update_layout(template='plotly_dark', height=240, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color="#E6EEF8"))
     st.plotly_chart(fig_ot, use_container_width=True, key='ov_ontime')
     # Insight for on-time
     ot_change = ontime[-1] - ontime[0]
@@ -110,7 +110,7 @@ with row2[1]:
     fig_p = go.Figure()
     fig_p.add_trace(go.Bar(x=proactive_categories, y=proactive_last, name='Last Month', marker_color='#6B7FD6'))
     fig_p.add_trace(go.Bar(x=proactive_categories, y=proactive_this, name='This Month', marker_color='#39D98A'))
-    fig_p.update_layout(barmode='group', template='simple_white', height=240, margin=dict(t=30,b=20), paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color="#0F172A"))
+    fig_p.update_layout(barmode='group', template='plotly_dark', height=240, margin=dict(t=30,b=20), paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color="#E6EEF8"))
     st.plotly_chart(fig_p, use_container_width=True, key='ov_proactive')
     # Insight for proactive safety
     total_last = proactive_last.sum()
@@ -123,7 +123,7 @@ with row2[2]:
     st.markdown("**Safety (quarters heatmap)**")
     z = np.array([safety_data[q] for q in quarters]).T
     fig_h = go.Figure(data=go.Heatmap(z=z, x=quarters, y=safety_categories, colorscale='Viridis'))
-    fig_h.update_layout(template='simple_white', height=240, margin=dict(t=30,b=20), paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color="#0F172A"))
+    fig_h.update_layout(template='plotly_dark', height=240, margin=dict(t=30,b=20), paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color="#E6EEF8"))
     st.plotly_chart(fig_h, use_container_width=True, key='ov_safety_heat')
     # Insight for safety performance
     total_by_quarter = [sum(safety_data[q]) for q in quarters]
