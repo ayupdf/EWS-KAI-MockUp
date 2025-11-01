@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import numpy as np
 
 # ==========================================
 # 🎨 WARNA & TEMA
@@ -242,8 +243,9 @@ for cat, val, color in zip(df["Category"], df["Value"], colors):
 
 # Layout bergaya light corporate
 fig.update_layout(
-    paper_bgcolor="#FFFFFF",
-    plot_bgcolor="#FFFFFF",
+    template='plotly_dark',
+    paper_bgcolor=COLOR_BG,
+    plot_bgcolor=COLOR_BG,
     font=dict(family="Inter, sans-serif", color=COLOR_TEXT, size=13),
     height=420,
     margin=dict(l=40, r=30, t=10, b=60),
@@ -257,7 +259,7 @@ fig.update_layout(
     ),
     yaxis=dict(
         showgrid=True,
-        gridcolor="#E2E8F0",
+        gridcolor="#1E293B",
         zeroline=False,
         tickfont=dict(size=12, color=COLOR_TEXT),
         title="Number of Incidents",
@@ -265,14 +267,64 @@ fig.update_layout(
 )
 
 # Masukkan chart ke dalam card
-st.markdown("""
-<div class='chart-card'>
-  <div class='chart-title'>📊 Category Breakdown</div>
-  <div class='chart-subtitle'>Breakdown of incidents by safety category for the selected quarter.</div>
-</div>
-""", unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-st.markdown("</div>", unsafe_allow_html=True)
+# (Chart will be rendered below via the visualization mode selector)
+
+# --- Improved insights & 3D visualization ---
+st.markdown("---")
+
+# Insights: per-category change vs previous quarter
+prev_vals = data[prev_q]
+changes = [curr - prev for curr, prev in zip(data[quarter], prev_vals)]
+pct_changes = [((c - p) / p * 100) if p != 0 else 0 for c, p in zip(data[quarter], prev_vals)]
+insights = pd.DataFrame({"Category": categories, "Current": data[quarter], "Previous": prev_vals, "Change": changes, "PctChange": pct_changes})
+insights_sorted = insights.sort_values('Change', ascending=False).reset_index(drop=True)
+
+ins_col1, ins_col2, ins_col3 = st.columns([1,1,2])
+with ins_col1:
+    best = insights_sorted.iloc[0]
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Largest decrease</div><div class='metric-value'>{best['Category']}</div><div class='metric-delta'>{best['Change']:+d}</div></div>", unsafe_allow_html=True)
+with ins_col2:
+    worst = insights_sorted.iloc[-1]
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Largest increase</div><div class='metric-value'>{worst['Category']}</div><div class='metric-delta'>{worst['Change']:+d}</div></div>", unsafe_allow_html=True)
+with ins_col3:
+    avg_change = insights['Change'].mean()
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Average change</div><div class='metric-value'>{avg_change:.1f}</div><div class='metric-delta'>vs prev quarter</div></div>", unsafe_allow_html=True)
+
+# Visualization mode: 2D bar, heatmap, or 3D surface
+viz_mode = st.selectbox('Visualization mode', options=['Category Breakdown (Bar)', 'Heatmap (All Quarters)', '3D Surface (Quarters vs Categories)'])
+
+# Prepare matrix z (categories x quarters)
+z = np.array([data[q] for q in quarters]).T  # shape (n_categories, n_quarters)
+
+if viz_mode == 'Category Breakdown (Bar)':
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key='safety_bar')
+
+elif viz_mode == 'Heatmap (All Quarters)':
+    heat = go.Figure(data=go.Heatmap(z=z, x=quarters, y=categories, colorscale='Viridis', reversescale=False))
+    heat.update_layout(template='plotly_dark', paper_bgcolor=COLOR_BG, plot_bgcolor=COLOR_BG, font=dict(color=COLOR_TEXT), height=420, margin=dict(l=40,r=40,t=30,b=40))
+    heat.update_xaxes(side='bottom')
+    st.plotly_chart(heat, use_container_width=True, config={"displayModeBar": False}, key='safety_heat')
+
+else:
+    # 3D surface
+    x = np.arange(len(quarters))
+    y = np.arange(len(categories))
+    surf = go.Figure(data=[go.Surface(z=z, x=x, y=y, colorscale='Viridis', showscale=True)])
+    surf.update_layout(template='plotly_dark', paper_bgcolor=COLOR_BG, plot_bgcolor=COLOR_BG, font=dict(color=COLOR_TEXT), height=520, margin=dict(l=40,r=40,t=40,b=40))
+    # map axis ticks to labels
+    surf.update_layout(scene=dict(
+        xaxis=dict(title='Quarter', tickmode='array', tickvals=list(x), ticktext=quarters),
+        yaxis=dict(title='Category', tickmode='array', tickvals=list(y), ticktext=categories),
+        zaxis=dict(title='Count')
+    ))
+    # camera
+    surf.update_layout(scene_camera=dict(eye=dict(x=1.6, y=1.6, z=0.8)))
+    st.plotly_chart(surf, use_container_width=True, config={"displayModeBar": True}, key='safety_surface')
+
+with st.expander('How to read these visuals'):
+    st.write('Use the visualization mode to switch between a 2D bar chart, a heatmap showing counts by category/quarter, and an interactive 3D surface for spatial understanding. Download the CSV for raw numbers. Hover to see exact values; rotate the 3D plot to inspect peaks.')
+
+st.caption('Top insights computed above highlight the categories with the largest changes vs the previous quarter.')
 
 # ==========================================
 # 📊 MAIN BAR CHART — Polished Light Corporate Style
@@ -391,8 +443,9 @@ if show_trend:
         ))
 
     trend_fig.update_layout(
-        paper_bgcolor="#FFFFFF",
-        plot_bgcolor="#FFFFFF",
+        paper_bgcolor=COLOR_BG,
+        plot_bgcolor=COLOR_BG,
+        template='plotly_dark',
         font=dict(color=COLOR_TEXT, family="Inter"),
         height=380,
         margin=dict(l=24, r=24, t=20, b=30),
@@ -404,5 +457,5 @@ if show_trend:
     )
     trend_fig.update_yaxes(title_text='Count', gridcolor="rgba(0,0,0,0.06)")
     trend_fig.update_xaxes(title_text='Quarter', showgrid=False)
-    st.plotly_chart(trend_fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(trend_fig, use_container_width=True, config={"displayModeBar": False}, key='safety_trend')
     st.markdown("</div>", unsafe_allow_html=True)
