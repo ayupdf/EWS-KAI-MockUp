@@ -10,6 +10,14 @@ COLOR_ORANGE = "#ED6B23"
 COLOR_BG = "#0F172A"       # dark navy background
 COLOR_TEXT = "#E2E8F0"     # light text for contrast
 COLOR_CARD = "#1E293B"     # dark card background
+COLOR_BORDER = "#E5E7EB"       # Soft border gray
+COLOR_PRIMARY = "#2F3E9E"      # Deep corporate blue
+COLOR_ACCENT = "#F59E0B"       # Warm amber
+# COLOR_BG = "#F9FAFB"           # Off-white background
+# COLOR_TEXT = "#1E293B"         # Rich dark gray-blue
+# COLOR_CARD = "#FFFFFF"         # Pure white cards
+# COLOR_BORDER = "#E5E7EB"       # Soft border gray
+COLOR_MUTED = "#64748B"        # Muted gray for subtitles
 
 # ==========================================
 # 📊 DATA
@@ -124,7 +132,9 @@ for i, (category, value) in enumerate(zip(categories, data[quarter])):
             unsafe_allow_html=True
         )
 
-# Overview metrics (total incidents this quarter, change vs previous quarter)
+# ==========================================
+# 📉 KPI METRICS (summary)
+# ==========================================
 quarters = list(data.keys())
 idx = quarters.index(quarter)
 prev_q = quarters[idx-1] if idx > 0 else quarters[-1]
@@ -134,22 +144,195 @@ delta = total - prev_total
 delta_pct = (delta / prev_total * 100) if prev_total != 0 else 0
 
 st.markdown("---")
-mc1, mc2, mc3 = st.columns([1.2,1.2,2])
+
+# --- Metric section (clean + responsive) ---
+mc1, mc2, mc3 = st.columns([1.2, 1.5, 2])
+
+# 💡 Custom style biar metric keliatan kayak card elegan
+metric_style = """
+<style>
+.metric-card {
+    background: linear-gradient(180deg,#0f1724 0%, #0b1220 100%);
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.04);
+    box-shadow: 0 6px 20px rgba(2,6,23,0.5);
+    text-align: center;
+}
+.metric-label {
+    color: #9fb0d6;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+}
+.metric-value {
+    color: #E6EEF8;
+    font-weight: 600;
+    font-size: 22px;
+}
+.metric-delta {
+    font-size: 13px;
+    color: #39D98A;
+}
+@media (max-width: 768px) {
+    .metric-card { margin-bottom: 12px; }
+}
+</style>
+"""
+st.markdown(metric_style, unsafe_allow_html=True)
+
+# --- Metric 1: total incidents ---
 with mc1:
-    st.metric("Total incidents (this quarter)", value=f"{total}", delta=f"{delta:+d} ({delta_pct:+.1f}%)")
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Total incidents (this quarter)</div>
+        <div class="metric-value">{total}</div>
+        <div class="metric-delta">{delta:+d} ({delta_pct:+.1f}%)</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- Metric 2: top category (auto wrap) ---
 with mc2:
     top_cat = df.sort_values('Value', ascending=False).iloc[0]['Category']
-    st.metric("Top category", value=top_cat)
-with mc3:
-    st.markdown("<div class='card'><p class='muted'>Use the trend toggle to see category-level trends across quarters. Download the full CSV for offline analysis.</p></div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Top category</div>
+        <div class="metric-value" style="white-space:normal; word-wrap:break-word;">
+            {top_cat}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
+# --- Metric 3: contextual note ---
+with mc3:
+    st.markdown("""
+    <div class="metric-card">
+        <div class="metric-label">Data note</div>
+        <div class="metric-value" style="font-size:14px; font-weight:400; color:#9fb0d6;">
+            Use the trend toggle to explore category-level changes. Download CSV for detailed analysis.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 # ==========================================
-# 📊 ROUNDED BAR CHART
+# 📊 MAIN BAR CHART — Gradient & Polished Style
 # ==========================================
 fig = go.Figure()
 
-colors = [COLOR_BLUE, COLOR_ORANGE, COLOR_BLUE, COLOR_ORANGE]
+# Warna utama yang harmonis
+colors = [
+    "#3B82F6",  # blue
+    "#F59E0B",  # amber
+    "#60A5FA",  # light blue
+    "#A78BFA"   # violet
+]
 
+# Tambahkan trace dengan efek gradient dan label rapi
+for cat, val, color in zip(df["Category"], df["Value"], colors):
+    fig.add_trace(go.Bar(
+        x=[cat],
+        y=[val],
+        text=[val],
+        textposition="outside",
+        marker=dict(
+            color=color,
+            line=dict(color="rgba(0,0,0,0.05)", width=1),
+            pattern=dict(shape=""),
+        ),
+        hovertemplate=f"<b>{cat}</b><br>Count: {val}<extra></extra>"
+    ))
+
+# Layout bergaya light corporate
+fig.update_layout(
+    paper_bgcolor="#FFFFFF",
+    plot_bgcolor="#FFFFFF",
+    font=dict(family="Inter, sans-serif", color=COLOR_TEXT, size=13),
+    height=420,
+    margin=dict(l=40, r=30, t=10, b=60),
+    showlegend=False,
+    hovermode="x unified",
+    bargap=0.35,
+    xaxis=dict(
+        showline=False,
+        showgrid=False,
+        tickfont=dict(size=12, color=COLOR_TEXT),
+    ),
+    yaxis=dict(
+        showgrid=True,
+        gridcolor="#E2E8F0",
+        zeroline=False,
+        tickfont=dict(size=12, color=COLOR_TEXT),
+        title="Number of Incidents",
+    ),
+)
+
+# Masukkan chart ke dalam card
+st.markdown("""
+<div class='chart-card'>
+  <div class='chart-title'>📊 Category Breakdown</div>
+  <div class='chart-subtitle'>Breakdown of incidents by safety category for the selected quarter.</div>
+</div>
+""", unsafe_allow_html=True)
+st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================================
+# 📊 MAIN BAR CHART — Polished Light Corporate Style
+# ==========================================
+
+chart_style = f"""
+<style>
+.chart-card {{
+    background: linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%);
+    border-radius: 18px;
+    border: 1px solid {COLOR_BORDER};
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    padding: 28px 32px;
+    margin-top: 22px;
+    transition: all 0.3s ease;
+}}
+.chart-card:hover {{
+    transform: translateY(-4px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+}}
+.chart-title {{
+    font-size: 20px;
+    font-weight: 700;
+    color: {COLOR_PRIMARY};
+    letter-spacing: 0.3px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}}
+.chart-title::before {{
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 24px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, {COLOR_PRIMARY} 0%, {COLOR_ACCENT} 100%);
+}}
+.chart-subtitle {{
+    font-size: 14px;
+    color: {COLOR_MUTED};
+    margin-bottom: 12px;
+}}
+@media (max-width: 768px) {{
+    .chart-card {{ padding: 20px 18px; }}
+    .chart-title {{ font-size: 16px; }}
+}}
+</style>
+"""
+st.markdown(chart_style, unsafe_allow_html=True)
+
+# --- Softer, modern corporate palette ---
+colors = [
+    "rgba(47,62,158,0.85)",   # Corporate Blue
+    "rgba(245,158,11,0.85)",  # Amber
+    "rgba(59,130,246,0.85)",  # Sky blue
+    "rgba(139,92,246,0.85)"   # Violet
+]
+
+fig = go.Figure()
 for cat, val, color in zip(df["Category"], df["Value"], colors):
     fig.add_trace(go.Bar(
         x=[cat],
@@ -157,56 +340,69 @@ for cat, val, color in zip(df["Category"], df["Value"], colors):
         name=cat,
         marker=dict(
             color=color,
-            line=dict(width=0),
-            opacity=0.9
+            line=dict(color="rgba(0,0,0,0.05)", width=1)
         ),
-        width=0.6,
         text=[val],
         textposition="outside",
         hovertemplate=f"<b>{cat}</b><br>Value: {val}<extra></extra>",
     ))
 
-# Gunakan shapes untuk efek rounded bar
-fig.update_traces(
-    marker_line_width=0,
-    hoverlabel=dict(font_size=13, font_family="Inter"),
-)
-
 fig.update_layout(
-    paper_bgcolor=COLOR_BG,
-    plot_bgcolor=COLOR_BG,
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="#FFFFFF",
     font=dict(color=COLOR_TEXT, family="Inter"),
-    xaxis=dict(showgrid=False, tickfont=dict(size=13)),
-    yaxis=dict(showgrid=True, gridcolor="#1E293B", zeroline=False),
-    margin=dict(l=40, r=40, t=40, b=40),
+    margin=dict(l=30, r=30, t=20, b=40),
     showlegend=False,
-    bargap=0.4,
+    bargap=0.3,
+    height=400,
+    hovermode="x unified",
+    xaxis=dict(
+        showgrid=False,
+        tickfont=dict(size=13, color=COLOR_TEXT),
+    ),
+    yaxis=dict(
+        showgrid=True,
+        gridcolor="rgba(0,0,0,0.08)",
+        zeroline=False,
+        tickfont=dict(size=12, color=COLOR_MUTED),
+    ),
 )
 
-# Custom rounded bar trick — gunakan layout radius (pseudo effect)
-fig.update_traces(marker=dict(line=dict(width=0, color=COLOR_BG)))
+# ==========================================
+# 📈 TREND CHART — Light Minimal Line Style
+# ==========================================
+if show_trend:
+    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='chart-title'>📈 Trend by Quarter</div>", unsafe_allow_html=True)
 
-st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-
-# Optional trend chart
-if 'show_trend' in locals() and show_trend:
     trend_fig = go.Figure()
+    palette = colors
     for i, cat in enumerate(categories):
         y = [data[q][i] for q in quarters]
-        trend_fig.add_trace(go.Scatter(x=quarters, y=y, mode='lines+markers', name=cat, marker=dict(size=8)))
+        trend_fig.add_trace(go.Scatter(
+            x=quarters,
+            y=y,
+            mode='lines+markers',
+            name=cat,
+            marker=dict(size=7, color=palette[i % len(palette)],
+                        line=dict(color="#FFFFFF", width=0.8)),
+            line=dict(width=3, color=palette[i % len(palette)], shape='spline'),
+            hovertemplate=f"<b>{cat}</b><br>%{{x}}: %{{y}}<extra></extra>",
+        ))
+
     trend_fig.update_layout(
-        template='plotly_dark',
-        paper_bgcolor=COLOR_BG,
-        plot_bgcolor=COLOR_BG,
-        font=dict(color=COLOR_TEXT),
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+        font=dict(color=COLOR_TEXT, family="Inter"),
         height=380,
-        margin=dict(l=24,r=24,t=24,b=24)
+        margin=dict(l=24, r=24, t=20, b=30),
+        hovermode="x unified",
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.05,
+            xanchor="right", x=1, font=dict(size=11, color=COLOR_MUTED)
+        ),
     )
-    trend_fig.update_yaxes(title_text='Count')
-    trend_fig.update_xaxes(title_text='Quarter')
+    trend_fig.update_yaxes(title_text='Count', gridcolor="rgba(0,0,0,0.06)")
+    trend_fig.update_xaxes(title_text='Quarter', showgrid=False)
     st.plotly_chart(trend_fig, use_container_width=True, config={"displayModeBar": False})
-
-with st.expander('How to read this'):
-    st.write('KPI cards show counts by category for the selected quarter. The total incidents metric compares to the previous quarter. Use the trend chart to observe category-level changes across quarters.')
-
-st.caption('Chart includes hover details. For screen-reader users, top-line metrics are exposed above.')
+    st.markdown("</div>", unsafe_allow_html=True)

@@ -122,4 +122,3 @@ with st.expander("How to read this chart"):
 
 ## Accessibility note
 st.caption("Chart includes hover tooltips. For screen-reader users, the latest value is shown above as a metric.")
-
