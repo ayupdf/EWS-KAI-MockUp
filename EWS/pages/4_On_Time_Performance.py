@@ -6,44 +6,49 @@ import numpy as np
 # Page config
 st.set_page_config(page_title="On-Time Performance", layout="wide")
 
-# --- Global CSS Styling ---
+# --- Global CSS Styling (Black theme) ---
 _CSS = """
 <style>
 body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
-.stApp { background: linear-gradient(180deg,#0b1220 0%, #07101a 100%); color: #E6EEF8; }
-.card {background: linear-gradient(180deg,#0f1724 0%, #0b1220 100%);
-       padding: 12px; border-radius: 10px;
-       border: 1px solid rgba(255,255,255,0.04);
-       box-shadow: 0 8px 24px rgba(2,6,23,0.6);}
-.muted {color: #9fb0d6;}
-.stSidebar { background: linear-gradient(180deg,#0f1724 0%, #0b1220 100%); }
-a, .st-a {color: #9fd1ff}
+.stApp { background: #000000; color: #E6EEF8; }
+.card {background: linear-gradient(180deg,#071018 0%, #000000 100%);
+    padding: 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.02);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);}
+.metric-card {background: linear-gradient(180deg,#081018 0%, #07101a 100%); padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.02);} 
+.metric-label {color:#9fb0d6; font-size:12px}
+.metric-value {color:#E6EEF8; font-size:18px; font-weight:600}
+.metric-delta.good {color:#7ee787}
+.metric-delta.bad {color:#ff6b6b}
+.muted {color: #9fb0d6}
+.stSidebar { background: linear-gradient(180deg,#071018 0%, #000000 100%); }
 h2, h1 {color: #E6EEF8}
 </style>
 """
 st.markdown(_CSS, unsafe_allow_html=True)
 
-# --- Header & Controls ---
-title_col, controls_col = st.columns([3,1])
+# --- Header ---
+title_col, _ = st.columns([3,1])
 with title_col:
     st.markdown("## ⏱️ On-Time Performance")
-    st.markdown("""
-    The **on-time performance rate** shows the percentage of shipments delivered within their scheduled window.
-    High values reflect strong service reliability and operational efficiency.
-    """)
 
-with controls_col:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("**Controls**")
-    region = st.selectbox("Region", ["All regions", "North", "South", "East", "West"])
-    service_type = st.selectbox("Service Type", ["All services", "Intermodal", "Local", "Express"])
-    show_ma = st.checkbox("Show 3-month moving average", value=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- Data setup ---
+# --- Variables used by controls ---
 months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 base_values = np.array([90.1,90.5,91.0,91.3,91.7,92.0,92.3,92.5,92.1,91.8,92.0,92.5])
 
+# Controls (compact row under header)
+ctrl_a, ctrl_b, ctrl_c, ctrl_d = st.columns([2,1,1.4,0.8])
+with ctrl_a:
+    region = st.selectbox("Region", ["All regions", "North", "South", "East", "West"], index=0)
+with ctrl_b:
+    service_type = st.selectbox("Service Type", ["All services", "Intermodal", "Local", "Express"], index=0)
+with ctrl_c:
+    start_month, end_month = st.select_slider("Month range", options=months, value=(months[0], months[-1]))
+with ctrl_d:
+    show_ma = st.checkbox("3-mo MA", value=True)
+
+# --- Data setup ---
 def adjust_values(vals, region_name, service_name):
     seed = (abs(hash(region_name)) + abs(hash(service_name))) % 97
     rng = np.random.default_rng(seed)
@@ -55,14 +60,7 @@ df = pd.DataFrame({"month": months, "ontime_pct": values})
 
 # --- Sidebar ---
 with st.sidebar:
-    st.header("Filters & Export")
-    start_month, end_month = st.select_slider(
-        "Month range", options=months, value=(months[0], months[-1])
-    )
-    start_idx = months.index(start_month)
-    end_idx = months.index(end_month) + 1
-    df = df.iloc[start_idx:end_idx].reset_index(drop=True)
-
+    st.header("Export")
     st.download_button(
         "Download CSV",
         df.to_csv(index=False).encode("utf-8"),
@@ -70,17 +68,23 @@ with st.sidebar:
         mime="text/csv"
     )
 
+# apply month range slice (compact control already defined)
+start_idx = months.index(start_month)
+end_idx = months.index(end_month) + 1
+df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+
 # --- Metrics ---
 current = df['ontime_pct'].iat[-1]
 previous = df['ontime_pct'].iat[-2] if len(df) > 1 else current
 delta = current - previous
 delta_pct = (delta / previous * 100) if previous != 0 else 0
 
-col1, col2, col3 = st.columns([1.2, 1.2, 2])
+col1, col2, col3 = st.columns([1.5,1.5,3])
 with col1:
-    st.metric("Current On-Time %", value=f"{current:.1f}%", delta=f"{delta:+.2f}% ({delta_pct:+.1f}%)")
+    delta_class = 'metric-delta good' if delta >= 0 else 'metric-delta bad'
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Current On-Time %</div><div class='metric-value'>{current:.1f}%</div><div class='{delta_class}'>Δ {delta:+.2f}% ({delta_pct:+.1f}%)</div></div>", unsafe_allow_html=True)
 with col2:
-    st.metric("Period Average (%)", value=f"{df['ontime_pct'].mean():.1f}%")
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Period Average</div><div class='metric-value'>{df['ontime_pct'].mean():.1f}%</div><div class='muted'>Range shown: {start_month} — {end_month}</div></div>", unsafe_allow_html=True)
 with col3:
     st.markdown("<div class='card'><span class='muted'>Target:</span> ≥ 90% — higher values indicate stronger reliability.</div>", unsafe_allow_html=True)
 
@@ -90,7 +94,7 @@ fig.add_trace(go.Scatter(
     x=df['month'], y=df['ontime_pct'],
     mode='lines+markers',
     line=dict(color="#FF7A00", width=3),
-    marker=dict(size=8, color="#FF7A00"),
+    marker=dict(size=6, color="#FF7A00"),
     name="On-Time %",
     hovertemplate='%{x}: %{y:.1f}%'
 ))
@@ -106,19 +110,19 @@ if show_ma and len(df) >= 3:
 
 fig.update_layout(
     template="plotly_dark",
-    paper_bgcolor="#07101a",
-    plot_bgcolor="#07101a",
+    paper_bgcolor="#000000",
+    plot_bgcolor="#000000",
     font=dict(color="#E6EEF8", size=13),
     margin=dict(l=20,r=20,t=30,b=20),
-    height=460,
+    height=380,
     hovermode="x unified",
     legend=dict(bgcolor='rgba(255,255,255,0.03)')
 )
 
-fig.update_xaxes(title_text="Month")
-fig.update_yaxes(title_text="On-Time Performance (%)", range=[0,100])
+fig.update_xaxes(title_text="Month", color='#E6EEF8')
+fig.update_yaxes(title_text="On-Time Performance (%)", range=[0,100], color='#E6EEF8')
 
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True, key='ontime_chart')
 
 # --- Help section ---
 with st.expander("How to read this chart"):

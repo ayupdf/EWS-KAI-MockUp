@@ -20,22 +20,11 @@ h2, h1 {color: #E6EEF8}
 
 st.markdown(_CSS, unsafe_allow_html=True)
 
-title_col, controls_col = st.columns([3,1])
+# --- Header ---
+title_col, _ = st.columns([3,1])
 with title_col:
     st.markdown("## 🚉 Terminal Dwell Time Trend")
-    st.markdown("""
-    This visualization shows the **average dwell time (hours)** that freight cars spend idle at terminals.
-    Lower dwell time improves asset utilization, network velocity, and service levels.
-    """)
 
-with controls_col:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.write("\n")
-    st.markdown("**Controls**")
-    available_stations = ["All terminals","Terminal A","Terminal B","Terminal C"]
-    station = st.selectbox("Station", available_stations, index=0)
-    smoothing = st.checkbox("Show 3-month moving average", value=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Data (sample monthly values) ---
 months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -50,18 +39,26 @@ def station_adjust(values, station_name: str):
     offsets = rng.normal(loc=0.0, scale=0.35, size=len(values))
     return values + offsets
 
-values = station_adjust(base_values, station)
+# --- Controls (compact row under header) ---
+ctrl1, ctrl2, ctrl3 = st.columns([2,2,1])
+with ctrl1:
+    available_stations = ["All terminals","Terminal A","Terminal B","Terminal C"]
+    station = st.selectbox("Station", available_stations, index=0)
+with ctrl2:
+    start_month, end_month = st.select_slider('Month range', options=months, value=(months[0], months[-1]))
+with ctrl3:
+    smoothing = st.checkbox("3-mo MA", value=True)
 
-# Sidebar filters for month range and download
+# apply station adjustment and slice by month range
+values = station_adjust(base_values, station)
+df = pd.DataFrame({"month": months, "dwell_hours": values})
+start_idx = months.index(start_month)
+end_idx = months.index(end_month) + 1
+df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+
+# Sidebar: only download
 with st.sidebar:
-    st.header("Filters")
-    start_month, end_month = st.select_slider(
-        'Month range', options=months, value=(months[0], months[-1])
-    )
-    start_idx = months.index(start_month)
-    end_idx = months.index(end_month) + 1
-    df = pd.DataFrame({"month": months, "dwell_hours": values})
-    df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+    st.header("Export")
     st.download_button("Download CSV", df.to_csv(index=False).encode('utf-8'), file_name='terminal_dwell.csv', mime='text/csv')
 
 # Metrics row
@@ -70,14 +67,17 @@ previous = df['dwell_hours'].iat[-2] if len(df) > 1 else df['dwell_hours'].iat[-
 delta = current - previous
 delta_pct = (delta / previous) * 100 if previous != 0 else 0
 
-m1, m2, m3 = st.columns([1.2,1.2,2])
-with m1:
-    st.metric(label="Current avg dwell (hrs)", value=f"{current:.1f}", delta=f"{delta:+.2f} ({delta_pct:+.1f}%)")
-with m2:
+col1, col2, col3 = st.columns([1.4,1.4,3])
+with col1:
+    delta_class = 'metric-delta good' if delta <= 0 else 'metric-delta bad'
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Current avg dwell (hrs)</div><div class='metric-value'>{current:.1f}</div><div class='{delta_class}'>Δ {delta:+.2f} hrs ({delta_pct:+.1f}%)</div></div>", unsafe_allow_html=True)
+with col2:
     seasonal = df['dwell_hours'].mean()
-    st.metric(label="Period average (hrs)", value=f"{seasonal:.1f}")
-with m3:
-    st.markdown("<div class='card'><span class='muted'>Data note:</span> Values are sample data for demo purposes. Select a station to see deterministic adjustments.</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Period average (hrs)</div><div class='metric-value'>{seasonal:.1f}</div><div class='muted'>Range: {start_month} — {end_month}</div></div>", unsafe_allow_html=True)
+with col3:
+    best = df['dwell_hours'].min()
+    worst = df['dwell_hours'].max()
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Range (min / max)</div><div class='metric-value'>{best:.1f} / {worst:.1f}</div><div class='muted'>Lower is better</div></div>", unsafe_allow_html=True)
 
 # Prepare traces
 fig = go.Figure()
@@ -102,11 +102,11 @@ if smoothing and len(df) >= 3:
 
 fig.update_layout(
     template='plotly_dark',
-    paper_bgcolor='#07101a',
-    plot_bgcolor='#07101a',
+    paper_bgcolor='#000000',
+    plot_bgcolor='#000000',
     font=dict(color="#E6EEF8", size=13),
-    margin=dict(l=20,r=20,t=30,b=20),
-    height=460,
+    margin=dict(l=16,r=16,t=20,b=16),
+    height=380,
     hovermode='x unified',
     legend=dict(bgcolor='rgba(255,255,255,0.03)')
 )
@@ -115,7 +115,7 @@ fig.update_xaxes(title_text='Month')
 fig.update_yaxes(title_text='Average dwell (hours)')
 
 # Chart + explanation
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True, key='dwell_chart')
 
 with st.expander("How to read this chart"):
     st.write("The solid orange line shows monthly average dwell time; the dashed line is the moving average (if enabled). Use the filters to focus the timeframe or station. Lower dwell times indicate better terminal efficiency.")
