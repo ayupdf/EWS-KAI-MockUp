@@ -1,17 +1,22 @@
 import streamlit as st
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 import numpy as np
+import requests
+import re
+import json
 
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="Proactive Safety — Leading Indicators", layout="wide")
 
-# Light theme CSS and neat card styles
+# --- CUSTOM DARK THEME CSS ---
 _CSS = """
 <style>
 body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
 .stApp { background: #000000; color: #E6EEF8; }
-.card {background: linear-gradient(180deg,#0b0b0b 0%, #070707 100%); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.02); box-shadow: 0 6px 18px rgba(0,0,0,0.6);} 
-.metric-card {background: linear-gradient(180deg,#081018 0%, #07101a 100%); padding: 14px; border-radius: 8px; border:1px solid rgba(255,255,255,0.02);}
+.card, .metric-card {background: linear-gradient(180deg,#0b0b0b 0%, #070707 100%);
+    padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);}
 .metric-label {color:#9fb0d6; font-size:13px;}
 .metric-value {color:#E6EEF8; font-size:22px; font-weight:600;}
 .metric-delta {color:#7ee787; font-size:13px;}
@@ -19,95 +24,198 @@ h2, h1 {color: #E6EEF8}
 .muted {color: #9fb0d6}
 </style>
 """
-
 st.markdown(_CSS, unsafe_allow_html=True)
 
-# Header
-st.markdown("## 🧯 Proactive Safety — Leading Indicators")
+# --- HEADER ---
+st.markdown("## 🧯 Proactive Safety — Leading Indicators (Peta Indonesia)")
 
+# --- METRIC CARDS SECTION ---
+data = pd.DataFrame({
+    "provinsi": ["Jawa Barat", "Jawa Tengah", "Sumatera Utara"],
+    "indikator": ["Track Defects Found", "Signal Failures", "Close Calls Reported"],
+    "last_month": [120, 50, 90],
+    "this_month": [130, 45, 100],
+})
+data["change"] = data["this_month"] - data["last_month"]
+data["pct_change"] = np.where(data["last_month"]==0, np.nan, data["change"] / data["last_month"] * 100)
+data["ratio"] = np.where(data["last_month"]==0, np.nan, data["this_month"] / data["last_month"])
 
-# Filters (placed under header for quick access)
-indicator_options = ["Track Defects Found", "Signal Failures", "Close Calls Reported"]
-filters_col1, filters_col2 = st.columns([3,1])
-with filters_col1:
-    selected = st.multiselect("Indicators", indicator_options, default=indicator_options)
-with filters_col2:
-    show_pct = st.checkbox("Show percent change on bars", value=True)
-
-# Sample data (replace with real dataset when available)
-categories = indicator_options
-last_month = np.array([120, 50, 90])
-this_month = np.array([130, 45, 100])
-
-# filter based on selection
-mask = [c in selected for c in categories]
-cats = [c for c, m in zip(categories, mask) if m]
-lm = last_month[mask]
-tm = this_month[mask]
-
-df = pd.DataFrame({"indicator": cats, "last_month": lm, "this_month": tm})
-df['change'] = df['this_month'] - df['last_month']
-df['pct_change'] = np.where(df['last_month'] == 0, 0, df['change'] / df['last_month'] * 100)
-
-with st.sidebar:
-    st.header("Export & Options")
-    st.download_button("Download CSV", df.to_csv(index=False).encode('utf-8'), file_name='leading_indicators.csv', mime='text/csv')
-
-# Compute top metrics (3 neat cards)
-total_this = int(df['this_month'].sum())
-total_last = int(df['last_month'].sum())
+total_this = data["this_month"].sum()
+total_last = data["last_month"].sum()
 tot_change = total_this - total_last
-tot_pct = (tot_change / total_last * 100) if total_last != 0 else 0
-avg_change = df['change'].mean() if len(df) else 0
+tot_pct = (tot_change / total_last *100) if total_last!=0 else np.nan
+avg_ratio = data["ratio"].mean()
 
-# largest increase / decrease
-if len(df):
-    max_idx = int(df['change'].idxmax())
-    min_idx = int(df['change'].idxmin())
-    largest_inc_label = df.at[max_idx, 'indicator']
-    largest_inc_val = int(df.at[max_idx, 'change'])
-    largest_dec_label = df.at[min_idx, 'indicator']
-    largest_dec_val = int(df.at[min_idx, 'change'])
-else:
-    largest_inc_label = largest_dec_label = "-"
-    largest_inc_val = largest_dec_val = 0
-
-card1, card2, card3 = st.columns([1.5,1.5,3])
+card1, card2, card3 = st.columns([1.5, 1.5, 3])
 with card1:
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>Total events (this month)</div><div class='metric-value'>{total_this}</div><div class='metric-delta'>Δ {tot_change:+d} ({tot_pct:+.1f}%)</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Total events (bulan ini)</div><div class='metric-value'>{total_this}</div><div class='metric-delta'>Δ {tot_change:+d} ({tot_pct:+.1f}%)</div></div>", unsafe_allow_html=True)
 with card2:
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>Avg change per indicator</div><div class='metric-value'>{avg_change:.1f}</div><div class='metric-delta muted'>Average of selected indicators</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Rata-rata rasio</div><div class='metric-value'>{avg_ratio:.2f}×</div><div class='metric-delta muted'>Across all indicators</div></div>", unsafe_allow_html=True)
 with card3:
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>Largest move</div><div style='display:flex;gap:12px;align-items:center'><div style='flex:1'><div class='metric-value'>+{largest_inc_val}</div><div class='muted'>{largest_inc_label} (increase)</div></div><div style='flex:1'><div class='metric-value'>{largest_dec_val}</div><div class='muted'>{largest_dec_label} (decrease)</div></div></div></div>", unsafe_allow_html=True)
+    idx_inc = data["change"].idxmax()
+    idx_dec = data["change"].idxmin()
+    inc_label = data.loc[idx_inc, "indikator"]
+    inc_val = data.loc[idx_inc, "change"]
+    dec_label = data.loc[idx_dec, "indikator"]
+    dec_val = data.loc[idx_dec, "change"]
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Pergerakan terbesar</div><div style='display:flex;gap:12px;align-items:center'><div style='flex:1'><div class='metric-value'>+{inc_val}</div><div class='muted'>{inc_label} (naik)</div></div><div style='flex:1'><div class='metric-value'>{dec_val}</div><div class='muted'>{dec_label} (turun)</div></div></div></div>", unsafe_allow_html=True)
 
-# Build Plotly figure
-colors = {"last":"#6B7FD6","this":"#39D98A"}
-fig = go.Figure()
-fig.add_trace(go.Bar(
-    x=df['indicator'], y=df['last_month'], name='Last Month', marker_color=colors['last'], offsetgroup=1,
-    hovertemplate='%{x}<br>Last: %{y}<extra></extra>'
-))
-fig.add_trace(go.Bar(
-    x=df['indicator'], y=df['this_month'], name='This Month', marker_color=colors['this'], offsetgroup=2,
-    text=(df['pct_change'].apply(lambda v: f"{v:.1f}%") if show_pct else None), textposition='outside' if show_pct else None,
-    hovertemplate='%{x}<br>This: %{y}<br>Change: %{customdata[0]:+.0f} (%{customdata[1]:.1f}%)<extra></extra>',
-    customdata=np.stack([df['change'], df['pct_change']], axis=-1)
-))
+st.markdown("---")
 
-fig.update_layout(
-    barmode='group',
-    template='plotly_dark',
-    paper_bgcolor='#000000',
-    plot_bgcolor='#000000',
-    font=dict(color="#E6EEF8", size=13),
-    margin=dict(l=24,r=24,t=28,b=24),
-    height=420,
-    hovermode='closest',
-    legend=dict(bgcolor='rgba(255,255,255,0.03)')
-)
+# --- FILTERS ---
+indicator_options = ["Track Defects Found", "Signal Failures", "Close Calls Reported"]
+selected = st.multiselect("Pilih indikator", indicator_options, default=indicator_options)
+show_pct = st.checkbox("Tampilkan rasio di peta", value=True)
 
-fig.update_xaxes(title_text='Indicator', color='#E6EEF8')
-fig.update_yaxes(title_text='Number of events', color='#E6EEF8')
+df = data[data["indikator"].isin(selected)].copy()
 
-st.plotly_chart(fig, use_container_width=True, key='proactive_leading_chart')
+# --- GEOJSON SETUP ---
+geojson = requests.get("https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province-simple.json").json()
+def _norm(s): return re.sub(r'[^a-z0-9]', '', str(s).lower()) if s else ""
 
+for feat in geojson.get('features', []):
+    for v in feat.get('properties', {}).values():
+        if isinstance(v, str):
+            feat['id'] = _norm(v)
+            break
+
+df['geo_id'] = df['provinsi'].astype(str).apply(_norm)
+
+# --- BUILD FULL PROVINCE MAP BASE ---
+provs = []
+for feat in geojson.get('features', []):
+    gid = feat.get('id', '')
+    name = next((feat['properties'].get(k) for k in ('NAME_1','Propinsi','provinsi','name') if k in feat['properties']), gid)
+    provs.append({'geo_id': gid, 'name': name})
+all_provs = pd.DataFrame(provs)
+
+merged = all_provs.merge(df, how='left', on='geo_id')
+
+# --- COLOR SETTINGS ---
+highlight_colors = {
+    "Track Defects Found": "#00BFFF",
+    "Signal Failures": "#FF4C4C",
+    "Close Calls Reported": "#00FF7F"
+}
+
+merged["color"] = merged["indikator"].map(highlight_colors)
+
+# --- LAYOUT: SPLIT BETWEEN BAR AND MAP ---
+col_bar, col_map = st.columns([0.6, 3])
+
+# --- LEFT: COMPACT / SLIM RATIO LIST ---
+with col_bar:
+    st.markdown("### 📊 Ratio (compact)")
+    province_colors = {
+        "Jawa Barat": "#0077FF",
+        "Jawa Tengah": "#FF3333",
+        "Sumatera Utara": "#7FFF7F",
+    }
+    df['prov_color'] = df['provinsi'].map(province_colors).fillna('#6e6e6e')
+
+    mini = px.bar(
+        df.sort_values('ratio', ascending=True),
+        x='ratio',
+        y='provinsi',
+        orientation='h',
+        color='provinsi',
+        color_discrete_map=province_colors,
+        text=df['ratio'].round(2).astype(str) + '×',
+        height=180,
+    )
+    mini.update_traces(marker_line_width=0, textposition='outside')
+    mini.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=6, b=6),
+        xaxis=dict(title='Ratio (This / Last Month)', showgrid=False),
+        yaxis=dict(title='', showticklabels=True),
+        showlegend=False,
+        font=dict(color='#E6EEF8')
+    )
+    st.plotly_chart(mini, use_container_width=True)
+
+# --- RIGHT: MAP with fixed province colors (no gradient, no borders, no legend) ---
+with col_map:
+    merged["value"] = merged["ratio"].fillna(0) if show_pct else merged["this_month"].fillna(0)
+
+    def _hex_to_rgba(hex_color, alpha=0.95):
+        h = hex_color.lstrip('#')
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return f'rgba({r},{g},{b},{alpha})'
+
+    province_colors_norm = {
+        'jawabarat': '#0077FF',
+        'jawatengah': '#FF3333',
+        'sumaterautara': '#7FFF7F'
+    }
+
+    fig = go.Figure()
+
+    highlighted = merged[merged['provinsi'].notna()].reset_index(drop=True)
+    for i, row in highlighted.iterrows():
+        gid = row['geo_id']
+        feat = next((f for f in geojson.get('features', []) if f.get('id') == gid), None)
+        if not feat:
+            continue
+        geom = feat.get('geometry', {})
+        color = province_colors_norm.get(gid, row.get('color', '#7f7f7f'))
+        fillcolor = _hex_to_rgba(color, alpha=0.95)
+
+        poly_groups = geom.get('coordinates', [])
+        if geom.get('type') == 'Polygon':
+            poly_groups = [poly_groups]
+        for poly in poly_groups:
+            exterior = poly[0]
+            try:
+                lons, lats = zip(*exterior)
+            except Exception:
+                continue
+            fig.add_trace(go.Scattermapbox(
+                lon=lons, lat=lats,
+                mode='none',
+                fill='toself',
+                fillcolor=fillcolor,
+                line=dict(color='rgba(0,0,0,0)', width=0),
+                hoverinfo='text',
+                hovertext=row.get('provinsi', ''),
+                showlegend=False
+            ))
+
+    # paint other provinces muted for context
+    others = merged[merged['provinsi'].isna()].reset_index(drop=True)
+    for i, row in others.iterrows():
+        gid = row['geo_id']
+        feat = next((f for f in geojson.get('features', []) if f.get('id') == gid), None)
+        if not feat:
+            continue
+        geom = feat.get('geometry', {})
+        poly_groups = geom.get('coordinates', [])
+        if geom.get('type') == 'Polygon':
+            poly_groups = [poly_groups]
+        for poly in poly_groups:
+            exterior = poly[0]
+            try:
+                lons, lats = zip(*exterior)
+            except Exception:
+                continue
+            fig.add_trace(go.Scattermapbox(
+                lon=lons, lat=lats,
+                mode='none',
+                fill='toself',
+                fillcolor='rgba(48,48,48,0.95)',
+                line=dict(color='rgba(0,0,0,0)', width=0),
+                hoverinfo='none',
+                showlegend=False
+            ))
+
+    fig.update_layout(
+        mapbox=dict(style='open-street-map', center={'lat': -2.5, 'lon': 118.0}, zoom=4),
+        height=720, margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("---")
+st.markdown("💡 *Gunakan data nyata agar pola antar-provinsi lebih akurat. Warna tiap indikator menggambarkan area fokus investigasi berbeda.*")
