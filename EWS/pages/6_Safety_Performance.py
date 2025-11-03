@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 import numpy as np
+from streamlit_echarts import st_echarts  # ✅ added for ECharts support
 
 # ==========================================
 # 🎨 WARNA & TEMA
@@ -11,14 +11,10 @@ COLOR_ORANGE = "#ED6B23"
 COLOR_BG = "#000000"       # pure black background
 COLOR_TEXT = "#E2E8F0"     # light text for contrast
 COLOR_CARD = "#07101a"     # very dark card background
-COLOR_BORDER = "#E5E7EB"       # Soft border gray
-COLOR_PRIMARY = "#2F3E9E"      # Deep corporate blue
-COLOR_ACCENT = "#F59E0B"       # Warm amber
-# COLOR_BG = "#F9FAFB"           # Off-white background
-# COLOR_TEXT = "#1E293B"         # Rich dark gray-blue
-# COLOR_CARD = "#FFFFFF"         # Pure white cards
-# COLOR_BORDER = "#E5E7EB"       # Soft border gray
-COLOR_MUTED = "#64748B"        # Muted gray for subtitles
+COLOR_BORDER = "#E5E7EB"   # Soft border gray
+COLOR_PRIMARY = "#2F3E9E"  # Deep corporate blue
+COLOR_ACCENT = "#F59E0B"   # Warm amber
+COLOR_MUTED = "#64748B"    # Muted gray for subtitles
 
 # ==========================================
 # 📊 DATA
@@ -38,11 +34,7 @@ categories = [
 
 # ==========================================
 # ⚙️ STREAMLIT PAGE CONFIG
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import numpy as np
-
+# ==========================================
 st.set_page_config(page_title="Safety Performance (trimmed)", layout="wide")
 
 # Minimal black theme CSS
@@ -59,21 +51,9 @@ body { background: #000000; color: #E6EEF8; font-family: Inter, sans-serif; }
 '''
 st.markdown(_CSS, unsafe_allow_html=True)
 
-# DATA (simplified)
-data = {
-    "Quarter 1": [5, 2, 11, 8],
-    "Quarter 2": [3, 1, 8, 6],
-    "Quarter 3": [4, 3, 9, 7],
-    "Quarter 4": [2, 1, 5, 4],
-}
-categories = [
-    "Derailments",
-    "Collisions",
-    "Highway-Rail Crossing Incidents",
-    "Employee Reportable Injuries"
-]
-
-# Header + filter
+# ==========================================
+# 🧾 HEADER
+# ==========================================
 st.markdown('''
 <div style="display:flex;align-items:center;gap:10px">
     <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -84,14 +64,21 @@ st.markdown('''
 </div>
 ''', unsafe_allow_html=True)
 
+# ==========================================
+# 📅 QUARTER FILTER
+# ==========================================
 quarter = st.selectbox("Select Quarter", options=list(data.keys()), index=2)
 
-# prepare dataframe and simple sidebar download
 df = pd.DataFrame({"Category": categories, "Value": data[quarter]})
-with st.sidebar:
-    st.download_button("Download CSV", df.to_csv(index=False).encode('utf-8'), file_name='safety_trimmed.csv', mime='text/csv')
 
-# Compute basic metrics (3 cards)
+# Sidebar download
+with st.sidebar:
+    st.download_button("Download CSV", df.to_csv(index=False).encode('utf-8'),
+                       file_name='safety_trimmed.csv', mime='text/csv')
+
+# ==========================================
+# 📈 METRICS
+# ==========================================
 total = int(df['Value'].sum())
 top_cat = df.sort_values('Value', ascending=False).iloc[0]['Category']
 minmax = f"{int(df['Value'].min())} / {int(df['Value'].max())}"
@@ -104,14 +91,45 @@ with col2:
 with col3:
     st.markdown(f"<div class='metric-card'><div class='metric-label'>Min / Max</div><div class='metric-value'>{minmax}</div></div>", unsafe_allow_html=True)
 
-# Main bar chart
-fig = go.Figure()
-colors = ["#3B82F6", "#F59E0B", "#60A5FA", "#A78BFA"]
-for cat, val, color in zip(df['Category'], df['Value'], colors):
-    fig.add_trace(go.Bar(x=[cat], y=[val], marker=dict(color=color), text=[val], textposition='outside', hovertemplate=f"{cat}: {val}<extra></extra>"))
+# ==========================================
+# 📊 MAIN CHART (ECharts)
+# ==========================================
+options = {
+    "backgroundColor": "#000000",
+    "tooltip": {"trigger": "axis"},
+    "xAxis": {
+        "type": "category",
+        "data": df["Category"].tolist(),
+        "axisLabel": {"color": "#E6EEF8"},
+    },
+    "yAxis": {
+        "type": "value",
+        "axisLabel": {"color": "#E6EEF8"},
+        "splitLine": {"lineStyle": {"color": "#222"}}
+    },
+    "series": [{
+        "data": df["Value"].tolist(),
+        "type": "bar",
+        "barWidth": "45%",
+        "itemStyle": {
+            "borderRadius": [6, 6, 0, 0],
+            "color": {
+                "type": "linear",
+                "x": 0, "y": 0, "x2": 0, "y2": 1,
+                "colorStops": [
+                    {"offset": 0, "color": "#3B82F6"},
+                    {"offset": 1, "color": "#1E3A8A"}
+                ],
+            },
+        },
+        "label": {
+            "show": True,
+            "position": "top",
+            "color": "#E6EEF8",
+            "fontSize": 12
+        },
+        "animationDuration": 1200
+    }]
+}
 
-fig.update_layout(template='plotly_dark', paper_bgcolor='#000000', plot_bgcolor='#000000', font=dict(color='#E6EEF8'), showlegend=False, height=420, margin=dict(l=20,r=20,t=20,b=40))
-fig.update_xaxes(showgrid=False)
-fig.update_yaxes(title='Count')
-
-st.plotly_chart(fig, use_container_width=True, key='safety_bar')
+st_echarts(options=options, height="420px", key="echart_safety_bar")
