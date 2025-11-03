@@ -52,9 +52,9 @@ avg_ratio = data["ratio"].mean()
 
 card1, card2, card3 = st.columns([1.5, 1.5, 3])
 with card1:
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>Total events (bulan ini)</div><div class='metric-value'>{total_this}</div><div class='metric-delta'>Δ {tot_change:+d} ({tot_pct:+.1f}%)</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Total events (This Month)</div><div class='metric-value'>{total_this}</div><div class='metric-delta'>Δ {tot_change:+d} ({tot_pct:+.1f}%)</div></div>", unsafe_allow_html=True)
 with card2:
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>Rata-rata rasio</div><div class='metric-value'>{avg_ratio:.2f}×</div><div class='metric-delta muted'>Across all indicators</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Average Ratio</div><div class='metric-value'>{avg_ratio:.2f}×</div><div class='metric-delta muted'>Across all indicators</div></div>", unsafe_allow_html=True)
 with card3:
     idx_inc = data["change"].idxmax()
     idx_dec = data["change"].idxmin()
@@ -62,7 +62,7 @@ with card3:
     inc_val = data.loc[idx_inc, "change"]
     dec_label = data.loc[idx_dec, "indikator"]
     dec_val = data.loc[idx_dec, "change"]
-    st.markdown(f"<div class='metric-card'><div class='metric-label'>Pergerakan terbesar</div><div style='display:flex;gap:12px;align-items:center'><div style='flex:1'><div class='metric-value'>+{inc_val}</div><div class='muted'>{inc_label} (naik)</div></div><div style='flex:1'><div class='metric-value'>{dec_val}</div><div class='muted'>{dec_label} (turun)</div></div></div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><div class='metric-label'>Biggest Moving</div><div style='display:flex;gap:12px;align-items:center'><div style='flex:1'><div class='metric-value'>+{inc_val}</div><div class='muted'>{inc_label} (increase)</div></div><div style='flex:1'><div class='metric-value'>{dec_val}</div><div class='muted'>{dec_label} (decrease)</div></div></div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -97,7 +97,7 @@ merged = all_provs.merge(df, how='left', on='geo_id')
 # --- COLOR MAP ---
 prov_colors = {
     "sumaterautara": "#90EE90",
-    "jawabarat": "#1E90FF",
+    "jawabarat": "#E5FF00",
     "jawatengah": "#FF4C4C"
 }
 merged["color"] = merged["geo_id"].map(prov_colors).fillna("#2f2f2f")
@@ -113,7 +113,7 @@ with col_bar:
         y="provinsi",
         color="indikator",
         orientation="h",
-        color_discrete_sequence=["#00BFFF", "#FF4C4C", "#00FF7F"],
+        color_discrete_sequence=["#E5FF00", "#FF4C4C", "#00FF7F"],
         text=df["ratio_scaled"].round(2).astype(str) + "×",
     )
     bar.update_layout(
